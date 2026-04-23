@@ -14,6 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { fileUpload } from "@/lib/services";
 import { createRecordingId, saveRecording } from "@/lib/utils";
 import {
   Delete01Icon,
@@ -30,14 +31,26 @@ import { useReactMediaRecorder } from "react-media-recorder";
 type ControllerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSessionChange?: (session: {
+    isActive: boolean;
+    isPaused: boolean;
+    remainingSeconds: number;
+    isUploading: boolean;
+  }) => void;
 };
 
 const RECORDING_LIMIT_SECONDS = 5 * 60;
 type PendingAction = "discard" | "restart" | null;
 
-const Controller = ({ open, onOpenChange }: ControllerProps) => {
-  const [includeMic, setIncludeMic] = useState(true);
+const Controller = ({
+  open,
+  onOpenChange,
+  onSessionChange,
+}: ControllerProps) => {
+  const [includeMic, setIncludeMic] = useState(false);
   const [confirmAction, setConfirmAction] = useState<PendingAction>(null);
+  const [uploadError, setUploadError] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const pendingActionRef = useRef<PendingAction>(null);
   const preferredMimeType = usePreferredRecordingMimeType();
 
@@ -55,7 +68,7 @@ const Controller = ({ open, onOpenChange }: ControllerProps) => {
     audio: includeMic,
     blobPropertyBag: { type: preferredMimeType },
     mediaRecorderOptions: { mimeType: preferredMimeType },
-    onStop: (blobUrl) => {
+    onStop: async (blobUrl, blob) => {
       const pendingAction = pendingActionRef.current;
 
       if (pendingAction === "discard" || pendingAction === "restart") {
@@ -65,14 +78,26 @@ const Controller = ({ open, onOpenChange }: ControllerProps) => {
 
       const recordingId = createRecordingId();
       const extension = preferredMimeType.includes("mp4") ? "mp4" : "webm";
+      const fileName = `clipr-recording-${recordingId}.${extension}`;
 
       saveRecording({
         createdAt: Date.now(),
-        downloadName: `growtrack-recording-${recordingId}.${extension}`,
+        downloadName: fileName,
         id: recordingId,
         mimeType: preferredMimeType,
         url: blobUrl,
       });
+
+      try {
+        setUploadError("");
+        setIsUploading(true);
+        await fileUpload(blob, fileName);
+      } catch (error) {
+        setUploadError("Recording saved locally, but upload failed.");
+        console.error("Upload failed", error);
+      } finally {
+        setIsUploading(false);
+      }
     },
     screen: true,
     selfBrowserSurface: "include",
@@ -124,19 +149,26 @@ const Controller = ({ open, onOpenChange }: ControllerProps) => {
     includeMic && (status === "recording" || status === "paused");
   const canDiscardOrRestart = canPause || canResume;
   const durationLabel = formatDuration(remainingSeconds);
-  const statusText = error ? getErrorText(error) : getStatusText(status);
-
-  useEffect(() => {
-    if (!open && canStop) {
-      stopRecording();
-    }
-  }, [open, canStop, stopRecording]);
+  const statusText = uploadError
+    ? uploadError
+    : error
+      ? getErrorText(error)
+      : getStatusText(status, isUploading);
 
   useEffect(() => {
     if (status === "recording" && remainingSeconds === 0) {
       stopRecording();
     }
   }, [remainingSeconds, status, stopRecording]);
+
+  useEffect(() => {
+    onSessionChange?.({
+      isActive: canStop,
+      isPaused: canResume,
+      remainingSeconds,
+      isUploading,
+    });
+  }, [canResume, canStop, isUploading, onSessionChange, remainingSeconds]);
 
   useEffect(() => {
     if (!canStop) {
@@ -171,6 +203,7 @@ const Controller = ({ open, onOpenChange }: ControllerProps) => {
 
   const handlePrimaryAction = () => {
     if (canStart) {
+      setUploadError("");
       startRecording();
       return;
     }
@@ -247,7 +280,7 @@ const Controller = ({ open, onOpenChange }: ControllerProps) => {
                 {statusText}
               </SheetDescription>
 
-              <div className="mb-5 flex items-center justify-center">
+              <div className="mb-5 flex items-center justify-center ">
                 <div className="rounded-full bg-gray-200 px-3 py-1">
                   <p className="text-sm font-semibold text-gray-800">
                     {durationLabel}
@@ -255,75 +288,76 @@ const Controller = ({ open, onOpenChange }: ControllerProps) => {
                 </div>
               </div>
 
-              <div className="flex h-14 w-auto items-center justify-center gap-2 rounded-full bg-gray-200 px-6">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={isBusy}
-                  onClick={handleMicToggle}
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
-                >
-                  <HugeiconsIcon
-                    icon={micIcon}
-                    size={22}
-                    className="text-gray-700"
-                  />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={isBusy || (!canPause && !canResume)}
-                  onClick={handlePauseToggle}
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
-                >
-                  <HugeiconsIcon
-                    size={22}
-                    icon={pauseIcon}
-                    className="text-gray-700"
-                  />
-                </Button>
-                <div className="flex h-19 w-19 items-center justify-center rounded-full bg-gray-200 shadow-md">
-                  <button
+              <div className="flex items-center justify-center">
+                <div className="flex h-14 items-center justify-center gap-2 rounded-full bg-gray-200 px-6">
+                  <Button
                     type="button"
-                    disabled={isBusy || (!canStart && !canStop)}
-                    onClick={handlePrimaryAction}
-                    className="flex h-[60%] w-[60%] cursor-pointer items-center justify-center rounded-full bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    variant="ghost"
+                    onClick={handleMicToggle}
+                    className={`${includeMic ? "bg-transparent" : "bg-gray-300"} flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300`}
                   >
-                    <div
-                      className={
-                        canStop
-                          ? `h-[45%] w-[45%] rounded ${primaryRingClass}`
-                          : `h-[85%] w-[85%] rounded-full ${primaryRingClass}`
-                      }
-                    ></div>
-                  </button>
+                    <HugeiconsIcon
+                      icon={micIcon}
+                      size={22}
+                      className="text-gray-700"
+                    />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isBusy || (!canPause && !canResume)}
+                    onClick={handlePauseToggle}
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
+                  >
+                    <HugeiconsIcon
+                      size={22}
+                      icon={pauseIcon}
+                      className="text-gray-700"
+                    />
+                  </Button>
+                  <div className="flex h-19 w-19 items-center justify-center rounded-full bg-gray-200 shadow-md">
+                    <button
+                      type="button"
+                      disabled={isBusy || (!canStart && !canStop)}
+                      onClick={handlePrimaryAction}
+                      className="flex h-[60%] w-[60%] cursor-pointer items-center justify-center rounded-full bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <div
+                        className={
+                          canStop
+                            ? `h-[45%] w-[45%] rounded ${primaryRingClass}`
+                            : `h-[85%] w-[85%] rounded-full ${primaryRingClass}`
+                        }
+                      ></div>
+                    </button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isBusy || !canDiscardOrRestart}
+                    onClick={() => setConfirmAction("restart")}
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
+                  >
+                    <HugeiconsIcon
+                      size={22}
+                      icon={RotateClockwiseIcon}
+                      className="text-gray-700"
+                    />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isBusy || !canDiscardOrRestart}
+                    onClick={() => setConfirmAction("discard")}
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
+                  >
+                    <HugeiconsIcon
+                      size={22}
+                      icon={Delete01Icon}
+                      className="text-gray-700"
+                    />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={isBusy || !canDiscardOrRestart}
-                  onClick={() => setConfirmAction("restart")}
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
-                >
-                  <HugeiconsIcon
-                    size={22}
-                    icon={RotateClockwiseIcon}
-                    className="text-gray-700"
-                  />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={isBusy || !canDiscardOrRestart}
-                  onClick={() => setConfirmAction("discard")}
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
-                >
-                  <HugeiconsIcon
-                    size={22}
-                    icon={Delete01Icon}
-                    className="text-gray-700"
-                  />
-                </Button>
               </div>
 
               {error ? (
@@ -367,11 +401,16 @@ const Controller = ({ open, onOpenChange }: ControllerProps) => {
               type="button"
               variant="outline"
               onClick={() => setConfirmAction(null)}
+              className="ring-0 border-0 py-5 px-5 cursor-pointer"
             >
               Cancel
             </Button>
-            <Button type="button" onClick={handleConfirmAction}>
-              Confirm
+            <Button
+              type="button"
+              className="bg-orange-600 text-white hover:bg-orange-700 cursor-pointer duration-150 ease-in-out transition py-5 px-5"
+              onClick={handleConfirmAction}
+            >
+              {confirmAction === "restart" ? "Restart" : "Discard"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -389,7 +428,11 @@ function formatDuration(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function getStatusText(status: string) {
+function getStatusText(status: string, isUploading = false) {
+  if (isUploading) {
+    return "Uploading your recording.";
+  }
+
   switch (status) {
     case "acquiring_media":
       return "Waiting for the share picker.";
