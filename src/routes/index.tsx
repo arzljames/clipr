@@ -4,10 +4,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  ArrowUpDownIcon,
-  Tick02Icon,
-} from "@hugeicons/core-free-icons";
+import { ArrowUpDownIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -36,14 +33,14 @@ function Index() {
   return (
     <div className="w-full max-w-400 m-auto">
       <div>
-        <h2 className="text-xl">Recently Added</h2>
-        <div className="w-full h-50 bg-gray-200 mt-4"></div>
+        <h2 className="text-xl font-medium text-gray-800">Recently Added</h2>
+        <div className="w-full h-100 rounded-3xl bg-gray-200 mt-4"></div>
       </div>
 
       <div className="mt-10 flex items-end justify-between">
         <div>
           <h4 className="text-sm text-gray-500">Library</h4>
-          <h2 className="text-xl text-gray-900">Videos</h2>
+          <h2 className="text-xl text-gray-800 font-medium">Videos</h2>
         </div>
 
         <Popover open={isSortPopoverOpen} onOpenChange={setIsSortPopoverOpen}>
@@ -52,7 +49,7 @@ function Index() {
               className="border-gray-300 cursor-pointer hover:bg-gray-100 duration-100 ease-in-out transition"
               variant="outline"
             >
-              <HugeiconsIcon icon={ArrowUpDownIcon} />
+              <HugeiconsIcon size={16} icon={ArrowUpDownIcon} />
               {sort.label}
             </Button>
           </PopoverTrigger>
