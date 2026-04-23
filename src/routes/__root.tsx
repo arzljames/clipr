@@ -1,19 +1,6 @@
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  ArrowDown01Icon,
-  ComputerScreenShareIcon,
-  Delete01Icon,
-  Mic02Icon,
-  PauseIcon,
-  Video02Icon,
-} from "@hugeicons/core-free-icons";
+import { Controller as ScreenRecorder } from "@/components/ScreenRecorder";
+import { Video02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
@@ -40,56 +27,10 @@ const RootLayout = () => {
         <Outlet />
       </div>
 
-      <Sheet open={isRecordDrawerOpen} onOpenChange={setIsRecordDrawerOpen}>
-        <SheetContent
-          side="bottom"
-          className="h-auto rounded-t-3xl border-t border-gray-200 bg-white p-0"
-        >
-          <SheetHeader className="border-b border-gray-200 px-6 py-5">
-            <div className="m-auto text-center flex flex-col">
-              <SheetTitle className="text-gray-900">
-                Instant Screen Recording
-              </SheetTitle>
-              <SheetDescription className="text-sm text-gray-600">
-                5 minutes recording limit
-              </SheetDescription>
-
-              <div className="m-auto bg-gray-200 mt-10 mb-5 w-auto py-1 px-3 rounded-full">
-                <p className="text-sm font-semibold text-gray-900">5:00</p>
-              </div>
-
-              <div className="bg-gray-200 w-auto px-6 h-14 rounded-full  flex items-center gap-2 justify-center">
-                <div className="w-10 h-10 flex items-center justify-center transition hover:bg-gray-300 duration-100 ease-in-out rounded-full cursor-pointer relative">
-                  <HugeiconsIcon icon={Mic02Icon} className="text-gray-700" />
-                  <span className="w-4 h-4 bg-gray-100 border border-gray-400 rounded-full absolute right-0 bottom-0 flex items-center justify-center">
-                    <HugeiconsIcon icon={ArrowDown01Icon} />
-                  </span>
-                </div>
-                <Button className="w-10 h-10 flex items-center justify-center transition hover:bg-gray-300 duration-100 ease-in-out rounded-full cursor-pointer">
-                  <HugeiconsIcon icon={PauseIcon} className="text-gray-700" />
-                </Button>
-                <div className="w-19 h-19  bg-gray-200 rounded-full flex items-center justify-center shadow-md">
-                  <div className=" cursor-pointer w-[60%] h-[60%] rounded-full flex items-center justify-center bg-gray-800">
-                    <div className="w-[85%] h-[85%] bg-red-500 rounded-full"></div>
-                  </div>
-                </div>
-                <Button className="w-10 h-10 flex items-center justify-center transition hover:bg-gray-300 duration-100 ease-in-out rounded-full cursor-pointer">
-                  <HugeiconsIcon
-                    icon={Delete01Icon}
-                    className="text-gray-700"
-                  />
-                </Button>
-                <Button className="w-10 h-10 flex items-center justify-center transition hover:bg-gray-300 duration-100 ease-in-out rounded-full cursor-pointer">
-                  <HugeiconsIcon
-                    icon={ComputerScreenShareIcon}
-                    className="text-gray-700"
-                  />
-                </Button>
-              </div>
-            </div>
-          </SheetHeader>
-        </SheetContent>
-      </Sheet>
+      <ScreenRecorder
+        open={isRecordDrawerOpen}
+        onOpenChange={setIsRecordDrawerOpen}
+      />
 
       <TanStackRouterDevtools />
     </div>
