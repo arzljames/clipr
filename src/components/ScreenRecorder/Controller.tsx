@@ -14,7 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fileUpload } from "@/lib/services";
+import { useFileUpload } from "@/hooks/useQueryInstance";
 import { createRecordingId, saveRecording } from "@/lib/utils";
 import {
   Delete01Icon,
@@ -27,6 +27,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReactMediaRecorder } from "react-media-recorder";
+import { toast } from "sonner";
 
 type ControllerProps = {
   open: boolean;
@@ -50,15 +51,16 @@ const Controller = ({
   const [includeMic, setIncludeMic] = useState(false);
   const [confirmAction, setConfirmAction] = useState<PendingAction>(null);
   const [uploadError, setUploadError] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
   const pendingActionRef = useRef<PendingAction>(null);
   const preferredMimeType = usePreferredRecordingMimeType();
+  const { mutateAsync: uploadFile, isPending: isUploading } = useFileUpload();
 
   const {
     error,
     isAudioMuted,
     muteAudio,
     pauseRecording,
+    previewAudioStream,
     resumeRecording,
     startRecording,
     status,
@@ -90,13 +92,12 @@ const Controller = ({
 
       try {
         setUploadError("");
-        setIsUploading(true);
-        await fileUpload(blob, fileName);
+        await uploadFile({ file: blob, fileName });
+        toast.success("Recording uploaded successfully.");
       } catch (error) {
         setUploadError("Recording saved locally, but upload failed.");
+        toast.error("Recording upload failed.");
         console.error("Upload failed", error);
-      } finally {
-        setIsUploading(false);
       }
     },
     screen: true,
@@ -145,9 +146,11 @@ const Controller = ({
   const canStop = status === "recording" || status === "paused";
   const canPause = status === "recording";
   const canResume = status === "paused";
-  const canToggleMute =
-    includeMic && (status === "recording" || status === "paused");
+  const canToggleMute = status === "recording" || status === "paused";
   const canDiscardOrRestart = canPause || canResume;
+  const hasCapturedAudioTrack =
+    (previewAudioStream?.getAudioTracks().length ?? 0) > 0;
+  const audioLevel = useAudioLevel(previewAudioStream, hasCapturedAudioTrack);
   const durationLabel = formatDuration(remainingSeconds);
   const statusText = uploadError
     ? uploadError
@@ -231,6 +234,13 @@ const Controller = ({
     }
 
     if (canToggleMute) {
+      if (!hasCapturedAudioTrack) {
+        toast.error(
+          "No audio track is attached. Turn the mic on before starting the recording.",
+        );
+        return;
+      }
+
       if (isAudioMuted) {
         unMuteAudio();
       } else {
@@ -250,9 +260,18 @@ const Controller = ({
     stopRecording();
   };
 
-  const micIcon = !includeMic || isAudioMuted ? MicOff02Icon : Mic02Icon;
+  const isMicOn =
+    status === "idle" || status === "stopped"
+      ? includeMic
+      : hasCapturedAudioTrack && !isAudioMuted;
+  const micIcon = isMicOn ? Mic02Icon : MicOff02Icon;
   const pauseIcon = canResume ? PlayIcon : PauseIcon;
   const primaryRingClass = canStop ? "bg-red-500" : "bg-orange-600";
+  const disableAllControls = isBusy || isUploading;
+  const showAudioWarning =
+    (status === "recording" || status === "paused") &&
+    includeMic &&
+    !hasCapturedAudioTrack;
 
   return (
     <>
@@ -261,12 +280,12 @@ const Controller = ({
           side="bottom"
           className="h-auto rounded-t-3xl border-t border-gray-200 bg-white p-0"
           onInteractOutside={(event) => {
-            if (confirmAction) {
+            if (confirmAction || isUploading) {
               event.preventDefault();
             }
           }}
           onPointerDownOutside={(event) => {
-            if (confirmAction) {
+            if (confirmAction || isUploading) {
               event.preventDefault();
             }
           }}
@@ -280,6 +299,14 @@ const Controller = ({
                 {statusText}
               </SheetDescription>
 
+              {showAudioWarning ? (
+                <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  No microphone audio is being captured in this recording.
+                  Enable the mic before you start recording, then allow browser
+                  audio access when prompted.
+                </div>
+              ) : null}
+
               <div className="mb-5 flex items-center justify-center ">
                 <div className="rounded-full bg-gray-200 px-3 py-1">
                   <p className="text-sm font-semibold text-gray-800">
@@ -288,24 +315,43 @@ const Controller = ({
                 </div>
               </div>
 
+              {isUploading ? (
+                <div className="mb-5 flex items-center justify-center gap-2 text-sm font-medium text-orange-700">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-orange-200 border-t-orange-600" />
+                  Saving to cloud...
+                </div>
+              ) : null}
+
               <div className="flex items-center justify-center">
                 <div className="flex h-14 items-center justify-center gap-2 rounded-full bg-gray-200 px-6">
                   <Button
                     type="button"
                     variant="ghost"
+                    disabled={disableAllControls}
                     onClick={handleMicToggle}
-                    className={`${includeMic ? "bg-transparent" : "bg-gray-300"} flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300`}
+                    className={`${isMicOn ? "bg-transparent" : "bg-gray-300"} relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300`}
                   >
                     <HugeiconsIcon
                       icon={micIcon}
                       size={22}
                       className="text-gray-700"
                     />
+                    {isMicOn && hasCapturedAudioTrack ? (
+                      <span className="pointer-events-none absolute bottom-1.5 flex items-end gap-[2px]">
+                        {buildAudioBars(audioLevel).map((barHeight, index) => (
+                          <span
+                            key={index}
+                            className="w-[2px] rounded-full bg-orange-600/80 transition-all duration-100"
+                            style={{ height: `${barHeight}px` }}
+                          />
+                        ))}
+                      </span>
+                    ) : null}
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
-                    disabled={isBusy || (!canPause && !canResume)}
+                    disabled={disableAllControls || (!canPause && !canResume)}
                     onClick={handlePauseToggle}
                     className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
                   >
@@ -318,7 +364,7 @@ const Controller = ({
                   <div className="flex h-19 w-19 items-center justify-center rounded-full bg-gray-200 shadow-md">
                     <button
                       type="button"
-                      disabled={isBusy || (!canStart && !canStop)}
+                      disabled={disableAllControls || (!canStart && !canStop)}
                       onClick={handlePrimaryAction}
                       className="flex h-[60%] w-[60%] cursor-pointer items-center justify-center rounded-full bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -334,7 +380,7 @@ const Controller = ({
                   <Button
                     type="button"
                     variant="ghost"
-                    disabled={isBusy || !canDiscardOrRestart}
+                    disabled={disableAllControls || !canDiscardOrRestart}
                     onClick={() => setConfirmAction("restart")}
                     className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
                   >
@@ -347,7 +393,7 @@ const Controller = ({
                   <Button
                     type="button"
                     variant="ghost"
-                    disabled={isBusy || !canDiscardOrRestart}
+                    disabled={disableAllControls || !canDiscardOrRestart}
                     onClick={() => setConfirmAction("discard")}
                     className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition duration-150 ease-in-out hover:bg-gray-300"
                   >
@@ -375,7 +421,7 @@ const Controller = ({
       <Dialog
         open={Boolean(confirmAction)}
         onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
+          if (!nextOpen && !isUploading) {
             setConfirmAction(null);
           }
         }}
@@ -400,6 +446,7 @@ const Controller = ({
             <Button
               type="button"
               variant="outline"
+              disabled={isUploading}
               onClick={() => setConfirmAction(null)}
               className="ring-0 border-0 py-5 px-5 cursor-pointer"
             >
@@ -407,6 +454,7 @@ const Controller = ({
             </Button>
             <Button
               type="button"
+              disabled={isUploading}
               className="bg-orange-600 text-white hover:bg-orange-700 cursor-pointer duration-150 ease-in-out transition py-5 px-5"
               onClick={handleConfirmAction}
             >
@@ -445,7 +493,7 @@ function getStatusText(status: string, isUploading = false) {
     case "stopping":
       return "Finishing your recording.";
     case "stopped":
-      return "Recording finished and saved locally.";
+      return "Recording finished and saved to cloud.";
     case "permission_denied":
       return "Permissions were denied.";
     default:
@@ -468,6 +516,74 @@ function getErrorText(error: string) {
     default:
       return "";
   }
+}
+
+function useAudioLevel(stream: MediaStream | null, enabled: boolean) {
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || !stream) {
+      setAudioLevel(0);
+      return;
+    }
+
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      }).webkitAudioContext;
+
+    if (!AudioContextClass) {
+      return;
+    }
+
+    const audioContext = new AudioContextClass();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    let animationFrameId = 0;
+
+    const updateLevel = () => {
+      analyser.getByteTimeDomainData(dataArray);
+
+      let sum = 0;
+      for (const value of dataArray) {
+        const normalized = (value - 128) / 128;
+        sum += normalized * normalized;
+      }
+
+      const rms = Math.sqrt(sum / dataArray.length);
+      setAudioLevel(Math.min(rms * 2.8, 1));
+      animationFrameId = window.requestAnimationFrame(updateLevel);
+    };
+
+    updateLevel();
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      source.disconnect();
+      void audioContext.close();
+      setAudioLevel(0);
+    };
+  }, [enabled, stream]);
+
+  return audioLevel;
+}
+
+function buildAudioBars(audioLevel: number) {
+  const minHeight = 3;
+  const maxHeight = 12;
+  const centerHeight = minHeight + audioLevel * maxHeight;
+
+  return [
+    Math.max(minHeight, centerHeight * 0.55),
+    Math.max(minHeight, centerHeight),
+    Math.max(minHeight, centerHeight * 0.7),
+  ];
 }
 
 function usePreferredRecordingMimeType() {

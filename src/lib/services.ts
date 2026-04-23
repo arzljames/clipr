@@ -1,6 +1,5 @@
 import type { VerifyTokenResponse } from "@/types";
 import { axiosInstance } from "./axiosInstance";
-import { v4 as uuidv4 } from "uuid";
 
 export const verifyToken = async (
   token: string,
@@ -83,13 +82,13 @@ export const getInstanceMediaData = async () => {
 };
 
 export const fileUpload = async (
+  uniqueId: string,
   file: Blob,
   fileName: string,
-  binZUID = import.meta.env.VITE_MEDIA_ZUID,
-  driver = import.meta.env.VITE_MEDIA_DRIVER,
-  bucketName = import.meta.env.VITE_MEDIA_BUCKET_NAME,
 ) => {
-  const uuid = uuidv4();
+  const binZUID = import.meta.env.VITE_MEDIA_ZUID;
+  const driver = import.meta.env.VITE_MEDIA_DRIVER;
+  const bucketName = import.meta.env.VITE_MEDIA_BUCKET_NAME;
   if (!binZUID || !driver || !bucketName) {
     throw new Error("Missing media upload environment variables.");
   }
@@ -117,13 +116,13 @@ export const fileUpload = async (
           data: {
             record: response.data.data[0].id,
             comments: null,
-            record_id: uuid,
+            record_id: uniqueId,
           },
           web: {
             canonicalTagMode: 1,
             parentZUID: "0",
-            pathPart: uuid,
-            metaTitle: uuid,
+            pathPart: uniqueId,
+            metaTitle: uniqueId,
           },
           meta: { langID: 1, contentModelZUID: "6-c29a99cfc8-c5gfdm" },
         },
@@ -131,6 +130,33 @@ export const fileUpload = async (
     }
 
     return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getScreenRecordsList = async (): Promise<{
+  data: {
+    data: {
+      recordId: string;
+      record: string;
+    };
+    meta: {
+      ZUID: string;
+      masterZUID: string;
+      contentModelZUID: string;
+    };
+  }[];
+  _meta: {
+    totalItems: number;
+  };
+}> => {
+  try {
+    const response = await axiosInstance.get(
+      "https://17vd2mpt-dev.webengine.zesty.io/datasets/records_list.json",
+    );
+    return response.data;
+    return JSON.parse(response.data);
   } catch (error) {
     throw error;
   }
