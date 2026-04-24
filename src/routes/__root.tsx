@@ -23,8 +23,8 @@ const RootLayout = () => {
   });
 
   return (
-    <div className="relative flex h-svh w-full flex-col">
-      <div className="sticky top-0 z-50 flex min-h-16 h-16 w-full flex-row items-center border-b border-b-gray-300 bg-white px-6">
+    <div className="relative flex min-h-svh w-full flex-col">
+      <div className="fixed top-0 z-50 flex h-16 w-full flex-row items-center border-b border-b-gray-300 bg-white/95 px-6 backdrop-blur-sm">
         <div className="m-auto flex h-full w-full max-w-400 items-center justify-between">
           <h1 className="text-2xl text-orange-600 font-bold">Clipr.</h1>
           <div className="flex items-center gap-3">
@@ -53,7 +53,7 @@ const RootLayout = () => {
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="px-6 pb-6 pt-22">
         <Outlet />
       </div>
 

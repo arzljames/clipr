@@ -5,7 +5,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useScreenRecordsList } from "@/hooks/useQueryInstance";
-import { ArrowUpDownIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowUpDownIcon,
+  Copy01Icon,
+  LinkSquare02Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -68,7 +73,7 @@ function Index() {
       }
       copyResetTimeoutRef.current = window.setTimeout(() => {
         setCopiedRecordId(null);
-      }, 2000);
+      }, 3000);
     } catch (error) {
       toast.error("Could not copy the share link.");
     }
@@ -165,8 +170,7 @@ function Index() {
 
         {!isLoading && !isError && sortedRecords.length === 0 ? (
           <div className="col-span-full rounded-3xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600">
-            No screen recordings yet. Start your first recording to see it
-            here.
+            No screen recordings yet. Start your first recording to see it here.
           </div>
         ) : null}
 
@@ -208,28 +212,29 @@ function Index() {
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-gray-400">
+                  {/* <div className="flex items-center justify-between text-xs text-gray-400">
                     <span>ZUID {record.meta.ZUID}</span>
                     <span>{record.meta.contentModelZUID}</span>
-                  </div>
+                  </div> */}
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-end gap-2">
                     <Button
                       asChild
-                      className="bg-orange-600 text-white hover:bg-orange-700"
+                      className="bg-orange-600 text-white hover:bg-orange-700 transition ease-in-out duration-150"
                     >
                       <a
                         href={buildRecordingShareUrl(record.data.recordId)}
                         rel="noreferrer"
                         target="_blank"
                       >
+                        <HugeiconsIcon icon={LinkSquare02Icon} size={16} />
                         Open
                       </a>
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
-                      className="border-gray-300"
+                      className="border-gray-300 text-gray-800 cursor-pointer bg-white hover:bg-gray-100 transition ease-in-out duration-150"
                       onClick={() => handleCopyShareLink(record.data.recordId)}
                     >
                       {copiedRecordId === record.data.recordId ? (
@@ -238,7 +243,10 @@ function Index() {
                           Copied
                         </>
                       ) : (
-                        "Copy Link"
+                        <>
+                          <HugeiconsIcon icon={Copy01Icon} size={16} /> Copy
+                          Link
+                        </>
                       )}
                     </Button>
                   </div>
