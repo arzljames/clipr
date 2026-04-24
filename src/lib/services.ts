@@ -2,7 +2,7 @@ import type { VerifyTokenResponse } from "@/types";
 import { axiosInstance } from "./axiosInstance";
 
 export const verifyToken = async (
-  token: string,
+  token: string
 ): Promise<VerifyTokenResponse> => {
   try {
     const response = await axiosInstance.get(
@@ -11,7 +11,7 @@ export const verifyToken = async (
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      },
+      }
     );
 
     return response.data;
@@ -22,7 +22,7 @@ export const verifyToken = async (
 
 export const VerifyUserAccess = async (
   userZuid: string,
-  token: string,
+  token: string
 ): Promise<boolean> => {
   try {
     const response = await axiosInstance.get(
@@ -31,7 +31,7 @@ export const VerifyUserAccess = async (
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      },
+      }
     );
 
     const instanceData = response.data?.data ?? [];
@@ -53,7 +53,7 @@ export const getInstanceMediaData = async () => {
       mediaBucketName: "",
     };
     const accountResponse = await axiosInstance.get(
-      `https://accounts.api.zesty.io/v1/instances/8-e8e981c5f6-2twrfl`,
+      `https://accounts.api.zesty.io/v1/instances/8-e8e981c5f6-2twrfl`
     );
 
     if (
@@ -61,7 +61,7 @@ export const getInstanceMediaData = async () => {
       accountResponse.data.data.ID !== ""
     ) {
       const mediaResponse = await axiosInstance.get(
-        `https://media-manager.api.zesty.io/site/${accountResponse.data.data.ID}/bins`,
+        `https://media-manager.api.zesty.io/site/${accountResponse.data.data.ID}/bins`
       );
 
       instanceData = {
@@ -84,7 +84,7 @@ export const getInstanceMediaData = async () => {
 export const fileUpload = async (
   uniqueId: string,
   file: Blob,
-  fileName: string,
+  fileName: string
 ) => {
   const binZUID = import.meta.env.VITE_MEDIA_ZUID;
   const driver = import.meta.env.VITE_MEDIA_DRIVER;
@@ -106,7 +106,7 @@ export const fileUpload = async (
         headers: {
           "Content-Type": "multipart/form-data",
         },
-      },
+      }
     );
 
     if (response.status === 201 && response.data?.data?.length > 0) {
@@ -125,7 +125,7 @@ export const fileUpload = async (
             metaTitle: uniqueId,
           },
           meta: { langID: 1, contentModelZUID: "6-c29a99cfc8-c5gfdm" },
-        },
+        }
       );
     }
 
@@ -153,10 +153,9 @@ export const getScreenRecordsList = async (): Promise<{
 }> => {
   try {
     const response = await axiosInstance.get(
-      "https://17vd2mpt-dev.webengine.zesty.io/datasets/records_list.json",
+      "https://17vd2mpt-dev.webengine.zesty.io/datasets/records_list.json"
     );
     return response.data;
-    return JSON.parse(response.data);
   } catch (error) {
     throw error;
   }
